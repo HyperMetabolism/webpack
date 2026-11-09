@@ -7,6 +7,10 @@ const require = createRequire(import.meta.url);
 
 const JavascriptParser = require("../../../lib/javascript/JavascriptParser.js");
 const analyzeScope = require("../../../lib/javascript/ScopeAnalyzer.js");
+const {
+	readParsedTree,
+	takeParsedTree
+} = require("../../../lib/javascript/syntax-parser.js");
 
 /** @type {typeof import("../../../lib/javascript/JavascriptParser")} */
 
@@ -37,43 +41,51 @@ const lodashSource = readPkgFile("lodash", "lodash.js");
 /**
  * @param {string} code source code
  * @param {"auto" | "module" | "script"} sourceType source type
- * @returns {EXPECTED_ANY} the parsed program
+ * @returns {number} the parsed program, in the tree `A` reads
  */
 const parse = (code, sourceType) =>
-	JavascriptParser._parse(code, {
-		sourceType,
-		ranges: true,
-		importPhases: false
-	}).ast;
+	JavascriptParser._parseTree(code, { sourceType, importPhases: false });
 
-const typescriptAst = parse(typescriptSource, "auto");
-const threeEsmAst = parse(threeEsmSource, "module");
-const lodashAst = parse(lodashSource, "auto");
+/**
+ * Parses a source once, keeping its tree for the analyses that read it.
+ * @param {string} code source code
+ * @param {"auto" | "module" | "script"} sourceType source type
+ * @returns {() => void} analyses the program, `A` pointed at its tree first
+ */
+const parseOnce = (code, sourceType) => {
+	const program = parse(code, sourceType);
+	const tree =
+		/** @type {import("../../../lib/javascript/syntax-parser").SyntaxTree} */ (
+			takeParsedTree()
+		);
+	return () => {
+		readParsedTree(tree, code);
+		analyzeScope(program);
+	};
+};
+
+const analyzeTypescript = parseOnce(typescriptSource, "auto");
+const analyzeThreeEsm = parseOnce(threeEsmSource, "module");
+const analyzeLodash = parseOnce(lodashSource, "auto");
 
 /**
  * @param {import("tinybench").Bench} bench bench
  * @returns {void}
  */
 export default (bench) => {
-	// ---- scope analysis over a pre-parsed AST ----
+	// ---- scope analysis over a pre-parsed tree ----
 	// The regression gate for analyzer changes: no parse noise.
 	bench.add(
 		"unit benchmark \"js-scope-analyzer-unit\", analyze 'typescript.js'",
-		() => {
-			analyzeScope(typescriptAst);
-		}
+		analyzeTypescript
 	);
 	bench.add(
 		"unit benchmark \"js-scope-analyzer-unit\", analyze 'three.module.js'",
-		() => {
-			analyzeScope(threeEsmAst);
-		}
+		analyzeThreeEsm
 	);
 	bench.add(
 		"unit benchmark \"js-scope-analyzer-unit\", analyze 'lodash.js'",
-		() => {
-			analyzeScope(lodashAst);
-		}
+		analyzeLodash
 	);
 
 	// ---- parse only, for the parse-vs-analyze split ----
