@@ -31521,6 +31521,12 @@ declare abstract class ScopeIdentifier {
 	name: string;
 	start: number;
 	end: number;
+
+	/**
+	 * Where it sits in the source, as the ESTree identifier it replaces held it.
+	 * @deprecated read `start` and `end`
+	 */
+	get range(): [number, number];
 }
 
 /**

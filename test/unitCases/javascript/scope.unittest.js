@@ -285,6 +285,8 @@ describe("ScopeAnalyzer", () => {
 			expect(varNames(catchScope)).toEqual(["e"]);
 			expect(catchScope.variables[0].identifiers).toHaveLength(1);
 			expect(catchScope.variables[0].identifiers[0].name).toBe("e");
+			const { start, end, range } = catchScope.variables[0].identifiers[0];
+			expect(range).toEqual([start, end]);
 			expect(refs(catchScope)).toHaveLength(0);
 		});
 
